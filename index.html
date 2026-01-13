@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>git diff files command</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f7f3ea;
+        --ink: #1f1b16;
+        --accent: #d1495b;
+        --panel: #fff7e6;
+        --muted: #6b5f53;
+        --shadow: rgba(31, 27, 22, 0.15);
+        --radius: 18px;
+        --font-display: "Georgia", "Times New Roman", serif;
+        --font-body: "Trebuchet MS", "Helvetica Neue", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: radial-gradient(circle at top, #fffaf0 0%, #f7f3ea 60%, #efe2cc 100%);
+        color: var(--ink);
+        font-family: var(--font-body);
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 32px 20px;
+      }
+
+      .shell {
+        width: min(960px, 100%);
+        background: var(--panel);
+        border-radius: calc(var(--radius) * 1.4);
+        box-shadow: 0 24px 60px var(--shadow);
+        padding: 32px 36px 28px;
+        border: 1px solid rgba(31, 27, 22, 0.08);
+      }
+
+      header h1 {
+        margin: 0 0 8px;
+        font-size: clamp(26px, 3vw, 36px);
+        font-family: var(--font-display);
+        letter-spacing: 0.02em;
+      }
+
+      header p {
+        margin: 0 0 24px;
+        color: var(--muted);
+        line-height: 1.6;
+        font-size: 15px;
+      }
+
+      form {
+        display: grid;
+        gap: 16px;
+      }
+
+      .grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+
+      label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+
+      input[type="text"] {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(31, 27, 22, 0.18);
+        background: #fff;
+        font-size: 15px;
+      }
+
+      .output {
+        background: #1f1b16;
+        color: #fff5df;
+        padding: 18px;
+        border-radius: var(--radius);
+        font-family: "Courier New", monospace;
+        font-size: 14px;
+        line-height: 1.5;
+        min-height: 96px;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+      }
+
+      button {
+        border: none;
+        background: var(--accent);
+        color: #fff;
+        padding: 10px 18px;
+        border-radius: 999px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 20px rgba(209, 73, 91, 0.25);
+      }
+
+      .ghost {
+        background: transparent;
+        color: var(--accent);
+        border: 1px solid rgba(209, 73, 91, 0.5);
+      }
+
+      .hint {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      @media (max-width: 720px) {
+        .shell {
+          padding: 24px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <h1>git diff files archive コマンド生成</h1>
+        <p>
+          コミット間の差分ファイルだけを zip 化するコマンドを生成します。テキストフィールドに
+          入力すると、下にコマンドが更新されます。
+        </p>
+      </header>
+
+      <form>
+        <div class="grid">
+          <div>
+            <label for="oldCommit">コミットID1（旧）</label>
+            <input id="oldCommit" type="text" placeholder="例: 3a1b2c3" />
+          </div>
+          <div>
+            <label for="newCommit">コミットID2（新）</label>
+            <input id="newCommit" type="text" placeholder="例: 9f8e7d6" />
+          </div>
+          <div>
+            <label for="fileName">ファイル名（拡張子なし）</label>
+            <input id="fileName" type="text" placeholder="例: diff-2026-01-13" />
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="copyBtn">コピー</button>
+          <button type="button" class="ghost" id="resetBtn">クリア</button>
+          <span class="hint">git archive の対象は新しいコミットです。</span>
+        </div>
+
+        <div>
+          <label>出力コマンド</label>
+          <div class="output" id="output"></div>
+        </div>
+      </form>
+    </main>
+
+    <script>
+      const oldCommit = document.getElementById("oldCommit");
+      const newCommit = document.getElementById("newCommit");
+      const fileName = document.getElementById("fileName");
+      const output = document.getElementById("output");
+      const copyBtn = document.getElementById("copyBtn");
+      const resetBtn = document.getElementById("resetBtn");
+
+      const buildCommand = () => {
+        const oldValue = oldCommit.value.trim() || "{コミットID1(旧)}";
+        const newValue = newCommit.value.trim() || "{コミットID2(新)}";
+        const nameValue = fileName.value.trim() || "{ファイル名}";
+
+        return `git archive ${newValue} \`git diff --name-only ${oldValue} ${newValue} --diff-filter=ACMR\` -o ${nameValue}.zip`;
+      };
+
+      const updateOutput = () => {
+        output.textContent = buildCommand();
+      };
+
+      const copyCommand = async () => {
+        try {
+          await navigator.clipboard.writeText(buildCommand());
+          copyBtn.textContent = "コピーしました";
+          setTimeout(() => {
+            copyBtn.textContent = "コピー";
+          }, 1500);
+        } catch (error) {
+          copyBtn.textContent = "失敗しました";
+        }
+      };
+
+      const resetForm = () => {
+        oldCommit.value = "";
+        newCommit.value = "";
+        fileName.value = "";
+        updateOutput();
+      };
+
+      [oldCommit, newCommit, fileName].forEach((input) => {
+        input.addEventListener("input", updateOutput);
+      });
+
+      copyBtn.addEventListener("click", copyCommand);
+      resetBtn.addEventListener("click", resetForm);
+
+      updateOutput();
+    </script>
+  </body>
+</html>
